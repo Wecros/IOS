@@ -1,7 +1,7 @@
 #!/bin/sh
 export POSIXLY_CORRECT=yes  # to ensure posix correct script
 
-# Print x hashes dependant on the count of passed argument
+# Print x hashes dependant on the count of passed argument.
 printhash() {
   total=$1 # passed count of files
   count=$total # count of hashes to be printed
@@ -23,13 +23,21 @@ printhash() {
   fi
 
   # for loop for printing hashes
-  for ((; count > 0; count--)); do
+  # for ((; count > 0; count--)); do
+  for i in $(seq 1 "$count"); do
     printf "#"
   done
   printf "\n"
 }
 
-# dirgraph [-i FILE_ERE] [-n] [DIR]
+# Exit the program with code 1 and print message passed as parameter/
+errexit() {
+  echo "$1" >&2
+  echo "Terminating program..."
+  exit 1
+}
+
+# dirgraph [-i FILE_ERE] [-n] [DIR], parsing arguments here
 while getopts ":i:n" opt; do
   case ${opt} in
     i )
@@ -39,10 +47,12 @@ while getopts ":i:n" opt; do
       use_normalization=true
       ;;
     \? )
-      echo "Invalid option: $OPTARG" 1>&2
+      echo "Invalid option: $OPTARG" >&2
+      exit 1
       ;;
     : )
-      echo "Invalid option: $OPTARG requires an argument" 1>&2
+      echo "Invalid option: $OPTARG requires an argument." >&2
+      exit 1
       ;;
   esac
 done
@@ -50,7 +60,8 @@ shift $((OPTIND -1))
 
 ROOT=$1 # passed argument of folder to search
 NF=0 # file count
-ND=0 # directory count
+ND=1 # directory count, starting at one to count the root dir
+# count of files for different file sizes
 lt100B=0
 lt1KiB=0
 lt10KiB=0
@@ -62,22 +73,25 @@ lt1GiB=0
 ge1GiB=0
 
 # change to the root's directory, if not found, exit with error code.
-cd "$ROOT" || exit 1;
+cd "$ROOT" 2>/dev/null || errexit "Specified directory does not exist or cannot be accessed."
 
+# find every file in dir and subdirectories, exit if insufficient permissions
 if [ -z "$FILE_ERE" ]; then
-  find=$(find *)
-else
-  find=$(find * | grep -v -E "$FILE_ERE")
+  find=$(find -- * 2>/dev/null) || errexit "Insufficient permissions to access files."
+else # extended regex flag triggered
+  find=$(find -- * | grep -v -E "$FILE_ERE" 2>/dev/null) || 
+    errexit "Insufficient permissions to access files."
 fi
 
 # for each file in found files
-for i in eval $find; do
-  if [ -d $i ]; then
+for i in $find; do
+  if [ -d "$i" ]; then # file is directory
     ND=$((ND+1))
-  elif [ -f $i ]; then
+  elif [ -f "$i" ]; then # file is file
     NF=$((NF+1))
-    size=$(wc -c < $i)
+    size=$(wc -c < "$i") # compute the size of files
 
+    # increment the variable count according to size of file
     if [ "$size" -lt 100 ]; then
       lt100B=$((lt100B+1))
     elif [ "$size" -lt 1000 ]; then
@@ -100,11 +114,7 @@ for i in eval $find; do
   fi
 done
 
-echo ROOT directory: "$ROOT"
-echo Directories: $ND
-echo All Files: $NF
-echo File size histogram:
-
+# if madness to determine which count of the files is largest
 if [ "$use_normalization" = true ]; then
   max_count=$lt100B
   if [ "$lt1KiB" -gt "$max_count" ]; then
@@ -133,7 +143,11 @@ if [ "$use_normalization" = true ]; then
   fi
 fi
 
-
+# print the results in the correct format
+echo ROOT directory: "$ROOT"
+echo Directories: $ND
+echo All Files: $NF
+echo File size histogram:
 printf "  <100B   : " 
 printhash "$lt100B"
 printf "  <1KiB   : " 
