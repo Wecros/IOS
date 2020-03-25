@@ -1,4 +1,14 @@
 #!/bin/sh
+
+# @file dirgraph.sh
+# @author Marek Filip (xfilip46), FIT BUT
+# @date 25/Mar/2020
+# @brief IOS-projekt-1
+# @details Script recursively searches current repository and prints out
+#          number of file and directory occurences. It also prints
+#          histogram specifying the file sizes.
+#          The script is POSIX compliant.
+
 export POSIXLY_CORRECT=yes  # to ensure posix correct script
 
 # Print x hashes dependant on the count of passed argument.
@@ -7,7 +17,7 @@ printhash() {
   count=$total # count of hashes to be printed
 
   # if the '-n' flag is active
-  if [ "$use_normalization" = true ]; then
+  if [ "$use_normalization" ]; then
     OFFSET=13 # offset for correct formatting
     terminal_width=$(tput cols)
     max_width=$((terminal_width - OFFSET)) # max width of line
@@ -23,7 +33,6 @@ printhash() {
   fi
 
   # for loop for printing hashes
-  # for ((; count > 0; count--)); do
   for i in $(seq 1 "$count"); do
     printf "#"
   done
@@ -37,6 +46,62 @@ errexit() {
   exit 1
 }
 
+
+
+# Process file, increment file count, compute size and increment correct var
+process_file() {
+  NF=$((NF+1)) # increment file count
+   # compute the size of file, terminate if insufficient permissions
+  size=$(wc -c 2>/dev/null < "$1") || errexit "Insufficient permissions to access files."
+  # increment the variable count according to size of file
+  if [ "$size" -lt 100 ]; then
+    lt100B=$((lt100B+1))
+  elif [ "$size" -lt 1000 ]; then
+    lt1KiB=$((lt1KiB+1))
+  elif [ "$size" -lt 10000 ]; then
+    lt10KiB=$((lt10KiB+1))
+  elif [ "$size" -lt 100000 ]; then
+    lt100KiB=$((lt100KiB+1))
+  elif [ "$size" -lt 1000000 ]; then
+    lt1MiB=$((lt1MiB+1))
+  elif [ "$size" -lt 10000000 ]; then
+    lt10MiB=$((lt10MiB+1))
+  elif [ "$size" -lt 100000000 ]; then
+    lt100MiB=$((lt100MiB+1))
+  elif [ "$size" -lt 1000000000 ]; then
+    lt1GiB=$((lt1GiB+1))
+  else
+    ge1GiB=$((ge1GiB+1))
+  fi
+}
+
+# Process dir, increment directory count.
+process_dir() {
+  ND=$((ND+1))
+}
+
+# Search files recursively and process files and dirs accordingly.
+search_files() {
+  for file in "$1"/* "$1"/.*; do  # for bash expansion, normal and hidden files
+    # testing dots so we don't create an infinite loop
+    if [ "$file" = "$1"/. ] || [ "$file" = "$1"/.. ]; then
+      continue
+    elif [ -n "$FILE_ERE" ]; then # regular expression -i used
+      basename=$(basename "$file" | grep -vE "$FILE_ERE")
+      if [ -z "$basename" ]; then
+        continue
+      fi
+    fi
+
+    if [ -f "$file" ]; then # file is file
+      process_file "$file"
+    elif [ -d "$file" ]; then # file is directory
+      process_dir "$file"
+      search_files "$file" # search directory recursively
+    fi
+  done
+}
+
 # dirgraph [-i FILE_ERE] [-n] [DIR], parsing arguments here
 while getopts ":i:n" opt; do
   case ${opt} in
@@ -47,20 +112,22 @@ while getopts ":i:n" opt; do
       use_normalization=true
       ;;
     \? )
-      echo "Invalid option: $OPTARG" >&2
-      exit 1
+      errexit "Invalid option: $OPTARG."
       ;;
     : )
-      echo "Invalid option: $OPTARG requires an argument." >&2
-      exit 1
+      errexit "Invalid option: $OPTARG requires an argument."
       ;;
   esac
 done
 shift $((OPTIND -1))
 
-ROOT=$1 # passed argument of folder to search
+if [ "$1" ]; then  # if argument exists
+  # change to the root's directory, if not found, exit with error code.
+  cd "$1" 2>/dev/null || errexit "Specified directory does not exist or cannot be accessed."
+fi
+ROOT=$(pwd) # assign root to current working directory
 NF=0 # file count
-ND=1 # directory count, starting at one to count the root dir
+ND=1 # directory count, start at one to count the base directory
 # count of files for different file sizes
 lt100B=0
 lt1KiB=0
@@ -72,47 +139,8 @@ lt100MiB=0
 lt1GiB=0
 ge1GiB=0
 
-# change to the root's directory, if not found, exit with error code.
-cd "$ROOT" 2>/dev/null || errexit "Specified directory does not exist or cannot be accessed."
-
-# find every file in dir and subdirectories, exit if insufficient permissions
-if [ -z "$FILE_ERE" ]; then
-  find=$(find -- * 2>/dev/null) || errexit "Insufficient permissions to access files."
-else # extended regex flag triggered
-  find=$(find -- * | grep -v -E "$FILE_ERE" 2>/dev/null) || 
-    errexit "Insufficient permissions to access files."
-fi
-
-# for each file in found files
-for i in $find; do
-  if [ -d "$i" ]; then # file is directory
-    ND=$((ND+1))
-  elif [ -f "$i" ]; then # file is file
-    NF=$((NF+1))
-    size=$(wc -c < "$i") # compute the size of files
-
-    # increment the variable count according to size of file
-    if [ "$size" -lt 100 ]; then
-      lt100B=$((lt100B+1))
-    elif [ "$size" -lt 1000 ]; then
-      lt1KiB=$((lt1KiB+1))
-    elif [ "$size" -lt 10000 ]; then
-      lt10KiB=$((lt10KiB+1))
-    elif [ "$size" -lt 100000 ]; then
-      lt100KiB=$((lt100KiB+1))
-    elif [ "$size" -lt 1000000 ]; then
-      lt1MiB=$((lt1MiB+1))
-    elif [ "$size" -lt 10000000 ]; then
-      lt10MiB=$((lt10MiB+1))
-    elif [ "$size" -lt 100000000 ]; then
-      lt100MiB=$((lt100MiB+1))
-    elif [ "$size" -lt 1000000000 ]; then
-      lt1GiB=$((lt1GiB+1))
-    else
-      ge1GiB=$((ge1GiB+1))
-    fi
-  fi
-done
+# main search functionality of the file
+search_files "$ROOT"
 
 # if madness to determine which count of the files is largest
 if [ "$use_normalization" = true ]; then
