@@ -46,7 +46,31 @@ errexit() {
   exit 1
 }
 
-
+# Print the result of the search in the correct format
+print_output() {
+  echo ROOT directory: "$ROOT"
+  echo Directories: $ND
+  echo All Files: $NF
+  echo File size histogram:
+  printf "  <100B   : " 
+  printhash "$lt100B"
+  printf "  <1KiB   : " 
+  printhash "$lt1KiB"
+  printf "  <10KiB  : " 
+  printhash "$lt10KiB"
+  printf "  <100KiB : " 
+  printhash "$lt100KiB"
+  printf "  <1MiB   : " 
+  printhash "$lt1MiB"
+  printf "  <10MiB  : " 
+  printhash "$lt10MiB"
+  printf "  <100MiB : " 
+  printhash "$lt100MiB"
+  printf "  <1GiB   : " 
+  printhash "$lt1GiB"
+  printf "  >=1GiB  : " 
+  printhash "$ge1GiB"
+}
 
 # Process file, increment file count, compute size and increment correct var
 process_file() {
@@ -139,8 +163,17 @@ lt100MiB=0
 lt1GiB=0
 ge1GiB=0
 
-# main search functionality of the file
-search_files "$ROOT"
+# if the root is not in regex exclusion, search the files
+echo $(basename "$ROOT")
+echo $(basename "$file" | grep -vE "$FILE_ERE")
+basename=$(basename "$file" | grep -vE "$FILE_ERE")
+if [ -n "$FILE_ERE" ] && [ -z "$basename" ]; then
+  echo basename: $basename
+  echo >/dev/null
+else
+  echo searching
+  search_files "$ROOT"
+fi
 
 # if madness to determine which count of the files is largest
 if [ "$use_normalization" = true ]; then
@@ -171,26 +204,4 @@ if [ "$use_normalization" = true ]; then
   fi
 fi
 
-# print the results in the correct format
-echo ROOT directory: "$ROOT"
-echo Directories: $ND
-echo All Files: $NF
-echo File size histogram:
-printf "  <100B   : " 
-printhash "$lt100B"
-printf "  <1KiB   : " 
-printhash "$lt1KiB"
-printf "  <10KiB  : " 
-printhash "$lt10KiB"
-printf "  <100KiB : " 
-printhash "$lt100KiB"
-printf "  <1MiB   : " 
-printhash "$lt1MiB"
-printf "  <10MiB  : " 
-printhash "$lt10MiB"
-printf "  <100MiB : " 
-printhash "$lt100MiB"
-printf "  <1GiB   : " 
-printhash "$lt1GiB"
-printf "  >=1GiB  : " 
-printhash "$ge1GiB"
+print_output # print the results in the correct format
