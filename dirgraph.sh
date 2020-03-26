@@ -33,7 +33,7 @@ printhash() {
   fi
 
   # for loop for printing hashes
-  for i in $(seq 1 "$count"); do
+  for _ in $(seq 1 "$count"); do
     printf "#"
   done
   printf "\n"
@@ -49,8 +49,8 @@ errexit() {
 # Print the result of the search in the correct format
 print_output() {
   echo ROOT directory: "$ROOT"
-  echo Directories: $ND
-  echo All Files: $NF
+  echo Directories: "$ND"
+  echo All Files: "$NF"
   echo File size histogram:
   printf "  <100B   : " 
   printhash "$lt100B"
@@ -76,7 +76,8 @@ print_output() {
 process_file() {
   NF=$((NF+1)) # increment file count
    # compute the size of file, terminate if insufficient permissions
-  size=$(wc -c 2>/dev/null < "$1") || errexit "Insufficient permissions to access files."
+  # size=$(wc -c 2>/dev/null < "$1") || errexit "Insufficient permissions to access files."
+  size=$(wc -c 2>/dev/null < "$1") || { wrong_perms=true; return 1; }
   # increment the variable count according to size of file
   if [ "$size" -lt 100 ]; then
     lt100B=$((lt100B+1))
@@ -104,28 +105,6 @@ process_dir() {
   ND=$((ND+1))
 }
 
-# Search files recursively and process files and dirs accordingly.
-search_files() {
-  for file in "$1"/* "$1"/.*; do  # for bash expansion, normal and hidden files
-    # testing dots so we don't create an infinite loop
-    if [ "$file" = "$1"/. ] || [ "$file" = "$1"/.. ]; then
-      continue
-    elif [ -n "$FILE_ERE" ]; then # regular expression -i used
-      basename=$(basename "$file" | grep -vE "$FILE_ERE")
-      if [ -z "$basename" ]; then
-        continue
-      fi
-    fi
-
-    if [ -f "$file" ]; then # file is file
-      process_file "$file"
-    elif [ -d "$file" ]; then # file is directory
-      process_dir "$file"
-      search_files "$file" # search directory recursively
-    fi
-  done
-}
-
 # dirgraph [-i FILE_ERE] [-n] [DIR], parsing arguments here
 while getopts ":i:n" opt; do
   case ${opt} in
@@ -150,8 +129,8 @@ if [ "$1" ]; then  # if argument exists
   cd "$1" 2>/dev/null || errexit "Specified directory does not exist or cannot be accessed."
 fi
 ROOT=$(pwd) # assign root to current working directory
+ND=0 # directory count
 NF=0 # file count
-ND=1 # directory count, start at one to count the base directory
 # count of files for different file sizes
 lt100B=0
 lt1KiB=0
@@ -163,17 +142,27 @@ lt100MiB=0
 lt1GiB=0
 ge1GiB=0
 
-# if the root is not in regex exclusion, search the files
-echo $(basename "$ROOT")
-echo $(basename "$file" | grep -vE "$FILE_ERE")
-basename=$(basename "$file" | grep -vE "$FILE_ERE")
-if [ -n "$FILE_ERE" ] && [ -z "$basename" ]; then
-  echo basename: $basename
-  echo >/dev/null
+# search the files recursively, if user has insufficient permissions: set flag
+if [ -z "$FILE_ERE" ]; then
+  files=$(find "$ROOT" -type f -name "*") || wrong_perms=true
+  dirs=$(find "$ROOT" -type d -name "*") || wrong_perms=true
 else
-  echo searching
-  search_files "$ROOT"
+  # grep is used in braces here because we want to check the return code of find
+  files=$(find "$ROOT" -type f -name "*" | 
+    { grep -vE "$FILE_ERE"; [ $? -eq 1 ]; }) || wrong_perms=true
+  dirs=$(find "$ROOT" -type d -name "*" | 
+    { grep -vE "$FILE_ERE"; [ $? -eq 1 ]; }) || wrong_perms=true
 fi
+
+# Set the internal field seperator for for loops as newline
+IFS="
+"
+for file in $files; do
+  process_file "$file"
+done
+for dir in $dirs; do
+  process_dir "$dir"
+done
 
 # if madness to determine which count of the files is largest
 if [ "$use_normalization" = true ]; then
@@ -204,4 +193,17 @@ if [ "$use_normalization" = true ]; then
   fi
 fi
 
+ # to catch some edge cases when regexing the basename
+if [ "$ND" -eq 0 ]; then
+  ND=1
+fi
+# if user had insufficient permissions for viewing some files
+if [ "$wrong_perms" ]; then
+  echo Not all files were counted because of insufficient permissions!
+fi
+
 print_output # print the results in the correct format
+# exit the program with exit code 1 if the user had insufficient permissions
+if [ "$wrong_perms" ]; then
+  exit 1
+fi
