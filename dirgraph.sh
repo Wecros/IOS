@@ -32,10 +32,13 @@ printhash() {
     fi
   fi
 
-  # for loop for printing hashes
-  for _ in $(seq 1 "$count"); do
-    printf "#"
-  done
+  # check if count isn't zero to catch some edge cases for seq on Eva server
+  if [ "$count" -ne 0 ]; then
+    # for loop for printing hashes
+    for _ in $(seq 1 "$count"); do
+      printf "#"
+    done
+  fi
   printf "\n"
 }
 
