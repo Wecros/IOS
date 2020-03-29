@@ -45,8 +45,13 @@ printhash() {
 # Exit the program with code 1 and print message passed as parameter/
 errexit() {
   echo "$1" >&2
-  echo "Terminating program..."
+  echo "Terminating program..." >&2
   exit 1
+}
+
+wrong_perms_echo() {
+  echo wc: ‘"$1"‘: Permission denied. >&2
+  wrong_perms=true
 }
 
 # Print the result of the search in the correct format
@@ -77,26 +82,25 @@ print_output() {
 
 # Process file, increment file count, compute size and increment correct var
 process_file() {
+  # compute the size of file, terminate if insufficient permissions
+  size=$(wc -c 2>/dev/null < "$1") || { wrong_perms_echo "$file"; return 1; }
   NF=$((NF+1)) # increment file count
-   # compute the size of file, terminate if insufficient permissions
-  # size=$(wc -c 2>/dev/null < "$1") || errexit "Insufficient permissions to access files."
-  size=$(wc -c 2>/dev/null < "$1") || { wrong_perms=true; return 1; }
   # increment the variable count according to size of file
   if [ "$size" -lt 100 ]; then
     lt100B=$((lt100B+1))
-  elif [ "$size" -lt 1000 ]; then
+  elif [ "$size" -lt 1024 ]; then
     lt1KiB=$((lt1KiB+1))
-  elif [ "$size" -lt 10000 ]; then
+  elif [ "$size" -lt 10240 ]; then
     lt10KiB=$((lt10KiB+1))
-  elif [ "$size" -lt 100000 ]; then
+  elif [ "$size" -lt 100240 ]; then
     lt100KiB=$((lt100KiB+1))
-  elif [ "$size" -lt 1000000 ]; then
+  elif [ "$size" -lt 1048576 ]; then
     lt1MiB=$((lt1MiB+1))
-  elif [ "$size" -lt 10000000 ]; then
+  elif [ "$size" -lt 10485760 ]; then
     lt10MiB=$((lt10MiB+1))
-  elif [ "$size" -lt 100000000 ]; then
+  elif [ "$size" -lt 104857600 ]; then
     lt100MiB=$((lt100MiB+1))
-  elif [ "$size" -lt 1000000000 ]; then
+  elif [ "$size" -lt 1073741824 ]; then
     lt1GiB=$((lt1GiB+1))
   else
     ge1GiB=$((ge1GiB+1))
@@ -151,10 +155,8 @@ if [ -z "$FILE_ERE" ]; then
   dirs=$(find "$ROOT" -type d -name "*") || wrong_perms=true
 else
   # grep is used in braces here because we want to check the return code of find
-  files=$(find "$ROOT" -type f -name "*" | 
-    { grep -vE "$FILE_ERE"; [ $? -eq 1 ]; }) || wrong_perms=true
-  dirs=$(find "$ROOT" -type d -name "*" | 
-    { grep -vE "$FILE_ERE"; [ $? -eq 1 ]; }) || wrong_perms=true
+  files=$(find "$ROOT" -type f -name "*" | grep -vE "$FILE_ERE") || wrong_perms=true
+  dirs=$(find "$ROOT" -type d -name "*" | grep -vE "$FILE_ERE") || wrong_perms=true
 fi
 
 # Set the internal field seperator for for loops as newline
@@ -202,7 +204,7 @@ if [ "$ND" -eq 0 ]; then
 fi
 # if user had insufficient permissions for viewing some files
 if [ "$wrong_perms" ]; then
-  echo Not all files were counted because of insufficient permissions!
+  echo Not all files were counted because of insufficient permissions! >&2
 fi
 
 print_output # print the results in the correct format
