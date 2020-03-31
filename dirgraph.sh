@@ -50,7 +50,7 @@ errexit() {
 }
 
 wrong_perms_echo() {
-  echo wc: ‘"$1"‘: Permission denied. >&2
+  echo wc: "‘""$1""‘": Permission denied. >&2
   wrong_perms=true
 }
 
