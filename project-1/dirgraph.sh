@@ -21,13 +21,14 @@ printhash() {
     OFFSET=13 # offset for correct formatting
     terminal_width=$(tput cols)
     max_width=$((terminal_width - OFFSET)) # max width of line
+    if [ ! -t 1 ]; then max_width=$((79 - OFFSET + 1)); fi
     # ratio of largest count of files to width of line
     ratio=$(echo "scale=2; $max_count / $max_width" | bc) 
 
     # if count of files is the largest of the counts and is over max width
     if [ "$total" -eq "$max_count" ] && [ "$total" -gt "$max_width" ]; then
       count=$max_width
-    elif [ "$total" -gt "$max_width" ]; then
+    elif [ "$max_width" -gt "$total" ]; then
       count=$(echo "$total / $ratio" | bc)
     fi
   fi
@@ -56,27 +57,27 @@ wrong_perms_echo() {
 
 # Print the result of the search in the correct format
 print_output() {
-  echo ROOT directory: "$ROOT"
+  echo Root directory: "$DIR"
   echo Directories: "$ND"
-  echo All Files: "$NF"
+  echo All files: "$NF"
   echo File size histogram:
-  printf "  <100B   : " 
+  printf "  <100 B  : " 
   printhash "$lt100B"
-  printf "  <1KiB   : " 
+  printf "  <1 KiB  : " 
   printhash "$lt1KiB"
-  printf "  <10KiB  : " 
+  printf "  <10 KiB : " 
   printhash "$lt10KiB"
-  printf "  <100KiB : " 
+  printf "  <100 KiB: " 
   printhash "$lt100KiB"
-  printf "  <1MiB   : " 
+  printf "  <1 MiB  : " 
   printhash "$lt1MiB"
-  printf "  <10MiB  : " 
+  printf "  <10 MiB : " 
   printhash "$lt10MiB"
-  printf "  <100MiB : " 
+  printf "  <100 MiB: " 
   printhash "$lt100MiB"
-  printf "  <1GiB   : " 
+  printf "  <1 GiB  : " 
   printhash "$lt1GiB"
-  printf "  >=1GiB  : " 
+  printf "  >=1 GiB : " 
   printhash "$ge1GiB"
 }
 
@@ -133,7 +134,10 @@ shift $((OPTIND -1))
 
 if [ "$1" ]; then  # if argument exists
   # change to the root's directory, if not found, exit with error code.
+  DIR="$1"
   cd "$1" 2>/dev/null || errexit "Specified directory does not exist or cannot be accessed."
+else
+  DIR=$(pwd)
 fi
 ROOT=$(pwd) # assign root to current working directory
 ND=0 # directory count
