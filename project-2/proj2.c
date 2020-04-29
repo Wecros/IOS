@@ -114,10 +114,13 @@ int sem_setup() {
     }
 
     // shared memory setup
-    int SHARED_PROT = PROT_READ | PROT_WRITE;
-    int SHARED_FLAGS = MAP_SHARED | MAP_ANONYMOUS;
+    int SHARED_PROT = PROT_READ | PROT_WRITE;  // write and read permissions
+    int SHARED_FLAGS = MAP_SHARED | MAP_ANONYMOUS; // handling of map data
     entered = mmap(NULL, sizeof(*entered), SHARED_PROT, SHARED_FLAGS, -1, 0);
     checked = mmap(NULL, sizeof(*checked), SHARED_PROT, SHARED_FLAGS, -1, 0);
+    if (entered == MAP_FAILED || checked == MAP_FAILED) {
+        return -1;
+    }
 
     return 0;
 }
