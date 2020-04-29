@@ -21,6 +21,7 @@
 #include <fcntl.h>          // for O_* constants
 #include <unistd.h>         // fork()
 #include <time.h>           // nanosleep, sleep
+#include <stdarg.h>         // fprintf arguments
 
 #endif
 
@@ -77,11 +78,19 @@ void process_judge(unsigned enter_time, unsigned conf_time);
  *
  * @returns 0 if everything was initialized, -1 if semaphor already exists.
  */
-int sem_and_mem_setup();
+int setup();
 
 /**
  * @brief Destroys all global semaphores and shared variables.
  *
  * @returns 0 if everything freed succesfully, -1 if error occured.
  */
-int sem_and_mem_cleanup();
+int cleanup();
+
+/**
+ * @brief Writes a line into the output file.
+ *
+ * @details Uses variable number of arguments for printing.
+ *          Increments the order of operations variable.
+ */
+void writelog(const char* fmt, ...);

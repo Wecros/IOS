@@ -20,8 +20,9 @@ const char *my_sem_name = "/xfilip46.ios.proj2.semaphore";
 sem_t *no_judge;  // turnstile for incoming immigrants, protects entered
 sem_t *mutex;     //
 sem_t *confirmed;
-int *entered = 0;
-int *checked = 0;
+int *entered;
+int *checked;
+int *ordernum;
 sem_t *exited;
 sem_t *allGone;
 FILE *out;
@@ -42,6 +43,16 @@ void print_help() {
     "    JT >= 0 && JT <= 2000.\n"
     "All arguments are integers.\n"
     );
+}
+
+void writelog(const char* fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+
+    vfprintf(out, fmt, ap);  // write the passed message to output file
+    (*ordernum)++;  // increment the order operations count
+
+    va_end(ap);
 }
 
 bool are_args_valid(int argc, char *argv[], args_t *args) {
@@ -120,10 +131,13 @@ int setup() {
     int SHARED_FLAGS = MAP_SHARED | MAP_ANONYMOUS; // handling of map data
     entered = mmap(NULL, sizeof(*entered), SHARED_PROT, SHARED_FLAGS, -1, 0);
     checked = mmap(NULL, sizeof(*checked), SHARED_PROT, SHARED_FLAGS, -1, 0);
-    if (entered == MAP_FAILED || checked == MAP_FAILED) {
+    ordernum = mmap(NULL, sizeof(*checked), SHARED_PROT, SHARED_FLAGS, -1, 0);
+    if (entered == MAP_FAILED || checked == MAP_FAILED || ordernum == MAP_FAILED) {
         fprintf(stderr, "ERROR: Initial setup of shared memory failed.\n");
         return -1;
     }
+    *entered = *checked = 0;
+    *ordernum = 1;
     // open the output file for writing, create if does not exist
     out = fopen("proj2.out", "w");
     if (out ==  NULL) {
@@ -147,7 +161,8 @@ int cleanup() {
     }
     int entered_code = munmap(entered, sizeof(*entered));
     int checked_code = munmap(checked, sizeof(*checked));
-    if (entered_code == -1 || checked_code == -1) {
+    int ordernum_code = munmap(ordernum, sizeof(*ordernum));
+    if (entered_code == -1 || checked_code == -1 || ordernum_code == -1) {
         fprintf(stderr, "ERROR: Cleanup of shared memory failed.\n");
         return -1;
     }
@@ -161,31 +176,31 @@ void process_immigrant(unsigned enter_time, unsigned getcert_time) {
     // rand_sleep(enter_time);
 
     // 1. init
-    fprintf(out, "A: NAME I: starts\n");
+    writelog("%d: NAME I: starts\n", *ordernum);
 
     // 2. wants to enter
 
     // entered
-    fprintf(out, "A: NAME I: enters: NE: NC: NB\n");
+    writelog("%d: NAME I: enters: NE: NC: NB\n", *ordernum);
 
     // 3. wants to register
 
     // registered
-    fprintf(out, "A: NAME I: checks: NE: NC: NB\n");
+    writelog("%d: NAME I: checks: NE: NC: NB\n", *ordernum);
 
     // 4. waits for judge's confirmation
 
     // 5. wants certificate
-    fprintf(out, "A: NAME I: wants certifiate: NE: NC: NB\n");
+    writelog("%d: NAME I: wants certifiate: NE: NC: NB\n", *ordernum);
     rand_sleep(getcert_time);
 
     // got certificate
-    fprintf(out, "A: NAME I: got certifiate: NE: NC: NB\n");
+    writelog("%d: NAME I: got certifiate: NE: NC: NB\n", *ordernum);
 
     // 6. wants to leave
 
     // left
-    fprintf(out, "A: NAME I: leaves: NE: NC: NB\n");
+    writelog("%d: NAME I: leaves: NE: NC: NB\n", *ordernum);
 }
 
 void process_judge(unsigned enter_time, unsigned conf_time) {
@@ -195,28 +210,28 @@ void process_judge(unsigned enter_time, unsigned conf_time) {
     // loop:
 
     // 2. wants to enter
-    fprintf(out, "A: NAME: wants to enter\n");
+    writelog("%d: NAME: wants to enter\n", *ordernum);
 
     // 3. entered
-    fprintf(out, "A: NAME: enters: NE: NC: NB\n");
+    writelog("%d: NAME: enters: NE: NC: NB\n", *ordernum);
 
     // 4. confirm the naturalization
 
     // wait for immigrants
-    fprintf(out, "A: NAME: waits for imm: NE: NC: NB\n");
+    writelog("%d: NAME: waits for imm: NE: NC: NB\n", *ordernum);
 
     // starts confirmation
-    fprintf(out, "A: NAME: starts confirmation: NE: NC: NB\n");
+    writelog("%d: NAME: starts confirmation: NE: NC: NB\n", *ordernum);
     rand_sleep(conf_time);
 
     // ends confirmation
-    fprintf(out, "A: NAME: ends confirmation: NE: NC: NB");
+    writelog("%d: NAME: ends confirmation: NE: NC: NB\n", *ordernum);
 
     // wants to leave
     rand_sleep(conf_time);
 
     // leaves
-    fprintf(out, "A: NAME: leaves: NE: NC: NB\n");
+    writelog("%d: NAME: leaves: NE: NC: NB\n", *ordernum);
 }
 
 
