@@ -17,6 +17,7 @@
 #include <semaphore.h>      // semaphores
 #include <sys/stat.h>       // for mode constants
 #include <sys/mman.h>       // shared memory
+#include <sys/wait.h>       // waitpid(), wait()
 #include <fcntl.h>          // for O_* constants
 #include <unistd.h>         // fork()
 #include <time.h>           // nanosleep, sleep
@@ -76,4 +77,11 @@ void process_judge(unsigned enter_time, unsigned conf_time);
  *
  * @returns 0 if everything was initialized, -1 if semaphor already exists.
  */
-int sem_setup();
+int sem_and_mem_setup();
+
+/**
+ * @brief Destroys all global semaphores and shared variables.
+ *
+ * @returns 0 if everything freed succesfully, -1 if error occured.
+ */
+int sem_and_mem_cleanup();

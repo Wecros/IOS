@@ -24,6 +24,7 @@ int *entered = 0;
 int *checked = 0;
 sem_t *exited;
 sem_t *allGone;
+FILE *out;
 
 
 void print_help() {
@@ -99,7 +100,7 @@ void rand_sleep(unsigned ms) {
     }
 }
 
-int sem_setup() {
+int setup() {
     // semaphore setup
     mode_t SEM_MODE = O_CREAT | O_EXCL;
     unsigned int SEM_PERMS = 0666;
@@ -110,6 +111,7 @@ int sem_setup() {
     // sem_init(&mutex, 0, 1);
     // sem_init(&confirmed, 0, 0);
     if (no_judge == SEM_FAILED || mutex == SEM_FAILED || confirmed == SEM_FAILED) {
+        fprintf(stderr, "ERROR: Initial setup of semaphores failed.\n");
         return -1;
     }
 
@@ -119,40 +121,71 @@ int sem_setup() {
     entered = mmap(NULL, sizeof(*entered), SHARED_PROT, SHARED_FLAGS, -1, 0);
     checked = mmap(NULL, sizeof(*checked), SHARED_PROT, SHARED_FLAGS, -1, 0);
     if (entered == MAP_FAILED || checked == MAP_FAILED) {
+        fprintf(stderr, "ERROR: Initial setup of shared memory failed.\n");
         return -1;
     }
+    // open the output file for writing, create if does not exist
+    out = fopen("proj2.out", "w");
+    if (out ==  NULL) {
+        fprintf(stderr, "ERROR: could not open proj2.out for writing.\n");
+        return -1;
+    }
+    setbuf(out, NULL);  // make file unbuffered so writing in it is instant
+
+    return 0;
+}
+
+int cleanup() {
+    // semaphor cleanup
+    if (sem_close(no_judge) == -1 || sem_close(mutex) == -1 ||
+            sem_close(confirmed) == -1) {
+        sem_unlink("wec.no_judge");
+        sem_unlink("wec.mutex");
+        sem_unlink("wec.confirmed");
+        fprintf(stderr, "ERROR: Cleanup of semaphores failed.\n");
+        return -1;
+    }
+    int entered_code = munmap(entered, sizeof(*entered));
+    int checked_code = munmap(checked, sizeof(*checked));
+    if (entered_code == -1 || checked_code == -1) {
+        fprintf(stderr, "ERROR: Cleanup of shared memory failed.\n");
+        return -1;
+    }
+    // close the file
+    fclose(out);
 
     return 0;
 }
 
 void process_immigrant(unsigned enter_time, unsigned getcert_time) {
-    rand_sleep(enter_time);
+    // rand_sleep(enter_time);
+
     // 1. init
-    printf("A: NAME: wants to enter\n");
+    fprintf(out, "A: NAME I: starts\n");
 
     // 2. wants to enter
 
     // entered
-    printf("A: NAME: enters: NE: NC: NB\n");
+    fprintf(out, "A: NAME I: enters: NE: NC: NB\n");
 
     // 3. wants to register
 
     // registered
-    printf("A: NAME I: checks: NE: NC: NB.\n");
+    fprintf(out, "A: NAME I: checks: NE: NC: NB\n");
 
     // 4. waits for judge's confirmation
 
     // 5. wants certificate
-    printf("A: NAME I: wants certifiate: NE: NC: NB\n");
+    fprintf(out, "A: NAME I: wants certifiate: NE: NC: NB\n");
     rand_sleep(getcert_time);
 
     // got certificate
-    printf("A: NAME I: got certifiate: NE: NC: NB.\n");
+    fprintf(out, "A: NAME I: got certifiate: NE: NC: NB\n");
 
     // 6. wants to leave
 
     // left
-    printf("A: NAME I: leaves: NE: NC: NB a\n");
+    fprintf(out, "A: NAME I: leaves: NE: NC: NB\n");
 }
 
 void process_judge(unsigned enter_time, unsigned conf_time) {
@@ -162,28 +195,28 @@ void process_judge(unsigned enter_time, unsigned conf_time) {
     // loop:
 
     // 2. wants to enter
-    printf("A: NAME: wants to enter.\n");
+    fprintf(out, "A: NAME: wants to enter\n");
 
     // 3. entered
-    printf("A: NAME: enters: NE: NC: NB\n");
+    fprintf(out, "A: NAME: enters: NE: NC: NB\n");
 
     // 4. confirm the naturalization
 
     // wait for immigrants
-    printf("A: NAME: waits for imm: NE: NC: NB\n");
+    fprintf(out, "A: NAME: waits for imm: NE: NC: NB\n");
 
     // starts confirmation
-    printf("A: NAME: starts confirmation: NE: NC: NB\n");
+    fprintf(out, "A: NAME: starts confirmation: NE: NC: NB\n");
     rand_sleep(conf_time);
 
     // ends confirmation
-    printf("A: NAME: ends confirmation: NE: NC: NB");
+    fprintf(out, "A: NAME: ends confirmation: NE: NC: NB");
 
     // wants to leave
     rand_sleep(conf_time);
 
     // leaves
-    printf("A: NAME: leaves: NE: NC: NB.\n");
+    fprintf(out, "A: NAME: leaves: NE: NC: NB\n");
 }
 
 
@@ -193,6 +226,12 @@ int main(int argc, char *argv[]) {
         print_help();
         return EXIT_FAILURE;
     }
+    if (setup() == -1) {
+        cleanup();
+        fprintf(stderr, "Terminating the program...\n");
+        return EXIT_FAILURE;
+    }
+
     #ifdef DEBUG
     fprintf(stderr, "Args: PI = %u\n"
         "      IG = %u\n"
@@ -202,34 +241,58 @@ int main(int argc, char *argv[]) {
         args.PI, args.IG, args.JG, args.IT, args.JT);
     #endif
 
-    if (sem_setup() == -1) {
-        fprintf(stderr, "ERROR: Initial setup failed.\n"
-                        "Terminating the program...\n");
-        return EXIT_FAILURE;
-    }
-
+    int wstatus, retcode;
     pid_t process = fork();
     if (process == 0) {
         // child process - immigrant generator
+        pid_t children_arr[args.PI];
         for (size_t i = 0; i < args.PI; i++) {
+            rand_sleep(args.IG);  // TODO:  check for IG == 0
             pid_t immigrant = fork();  // immigrant process
-            process_immigrant(args.IG, args.IT);
-            return(EXIT_SUCCESS);
+            if (immigrant == 0) {
+                process_immigrant(args.IG, args.IT);
+                return(EXIT_SUCCESS);
+            } else {
+                children_arr[i] = immigrant;
+                ; // generator proceeds
+            }
         }
 
-        pid_t generator = fork();
-        if (generator == 0) {
-            // generate_immigrants(int PI, int delay);
+        int wstatusall;
+        for (size_t i = 0; i < args.PI; i++) {
+            waitpid(children_arr[i], &wstatus, WNOHANG);
+            wstatusall |= wstatus;
         }
+
+        // pid_t generator = fork();
+        // if (generator == 0) {
+        //     // generate_immigrants(int PI, int delay);
+        // }
+        // wait(&wstatus);
+
+        if (WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == EXIT_SUCCESS) {
+            fprintf(stderr, "\nIMM GEN - EVERYTHING OK.\n\n");
+            retcode = EXIT_SUCCESS;
+        } else {
+            fprintf(stderr, "\nIMM GEN - SOMETHING PROBABLY HAPPENED.\n\n");
+            retcode = EXIT_FAILURE;
+        }
+        return retcode;
     } else {
         // parent process - judge
         process_judge(args.JG, args.JT);
-        return (EXIT_SUCCESS);
     }
 
-    // TODO: make semaphore closing and variable unmapping
-    sem_close(no_judge);
-    sem_close(mutex);
-    sem_close(confirmed);
-    return EXIT_SUCCESS;
+    wait(&wstatus); // waits for immigrant generator to die
+    if (WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == EXIT_SUCCESS) {
+        fprintf(stderr, "\nMAIN JUDGE - EVERYTHING OK.\n\n");
+        retcode = EXIT_SUCCESS;
+    } else {
+        fprintf(stderr, "\nMAIN JUDGE - SOMETHING PROBABLY HAPPENED.\n\n");
+        retcode = EXIT_FAILURE;
+    }
+    if (cleanup() == -1) {
+        return EXIT_FAILURE;
+    }
+    return retcode;
 }
