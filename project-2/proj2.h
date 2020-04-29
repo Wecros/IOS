@@ -23,6 +23,7 @@
 #include <time.h>           // nanosleep, sleep
 #include <stdarg.h>         // fprintf arguments
 
+// #define DEBUG               // debug logs define
 #endif
 
 /**
@@ -65,7 +66,7 @@ void rand_sleep(unsigned ms);
  * @brief Processes immigrants.
  *
  */
-void process_immigrant(unsigned enter_time, unsigned getcert_time);
+void process_immigrant(unsigned ID, unsigned getcert_time);
 
 /**
  * @brief Processes judge.
@@ -94,3 +95,23 @@ int cleanup();
  *          Increments the order of operations variable.
  */
 void writelog(const char* fmt, ...);
+
+/**
+ * @brief Function to signify that an immigrant entered the building.
+ */
+void immEnter(const char* NAME, unsigned ID);
+
+/**
+ * @brief Function to signify that an immigrant was registered.
+ */
+void immCheckIn(const char* NAME, unsigned ID);
+
+/**
+ * @brief Function to signify that an immigrant has left the building.
+ */
+void immLeave(const char* NAME, unsigned ID);
+
+/**
+ * @brief Function to signify that a judge entered the building.
+ */
+void judgeEnter(const char* NAME);
