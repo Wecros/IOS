@@ -20,11 +20,13 @@ sem_t *mutex;     //
 sem_t *confirmed;
 sem_t *allSignedIn;
 sem_t *logWritten;
+sem_t *parent;
 const char* no_judge_name = "wec.no_judge";
 const char* mutex_name = "wec.mutex";
 const char* confirmed_name = "wec.confirmed";
 const char* allSignedIn_name = "wec.allSignedIn";
 const char* logWritten_name = "wec.printing";
+const char* parent_name = "wec.parent";
 int *entered;
 int *checked;
 int *A;
@@ -32,6 +34,7 @@ int *NE;
 int *NC;
 int *NB;
 int *activeImmigrants;
+int *processesCount;
 bool *judge;
 int immigrantID = 1;
 sem_t *exited;
@@ -103,6 +106,9 @@ bool are_args_valid(int argc, char *argv[], args_t *args) {
 }
 
 void rand_sleep(unsigned ms) {
+    if (ms == 0) {
+        return;
+    }
     srand(time(0));  // set starting point for pseudo-random operations
     ms = rand() % (ms + 1);  // integer in interval <0, ms>
     struct timespec req, rem;
@@ -134,6 +140,7 @@ int setup() {
     confirmed = sem_open(confirmed_name, SEM_MODE, SEM_PERMS, 0);
     allSignedIn = sem_open(allSignedIn_name, SEM_MODE, SEM_PERMS, 0);
     logWritten = sem_open(logWritten_name, SEM_MODE, SEM_PERMS, 1);
+    parent = sem_open(parent_name, SEM_MODE, SEM_PERMS, 0);
     // sem_init(&no_judge, 0, 1);
     // sem_init(&mutex, 0, 1);
     // sem_init(&confirmed, 0, 0);
@@ -154,12 +161,13 @@ int setup() {
     NB = mmap(NULL, sizeof(*checked), SHARED_PROT, SHARED_FLAGS, -1, 0);
     activeImmigrants = mmap(NULL, sizeof(*checked), SHARED_PROT, SHARED_FLAGS, -1, 0);
     judge = mmap(NULL, sizeof(*checked), SHARED_PROT, SHARED_FLAGS, -1, 0);
+    processesCount = mmap(NULL, sizeof(*checked), SHARED_PROT, SHARED_FLAGS, -1, 0);
 
     if (entered == MAP_FAILED || checked == MAP_FAILED || A == MAP_FAILED) {
         fprintf(stderr, "ERROR: Initial setup of shared memory failed.\n");
         return -1;
     }
-    *entered = *checked = *NE = *NC = *NB = *activeImmigrants = 0;
+    *entered = *checked = *NE = *NC = *NB = *activeImmigrants = *processesCount = 0;
     *judge = false;
     *A = 1;
     // open the output file for writing, create if does not exist
@@ -185,6 +193,7 @@ int cleanup() {
     sem_retcode |= sem_unlink(confirmed_name);
     sem_retcode |= sem_unlink(allSignedIn_name);
     sem_retcode |= sem_unlink(logWritten_name);
+    sem_retcode |= sem_unlink(parent_name);
     // if (sem_retcode == -1) {
     //     fprintf(stderr, "ERROR: Cleanup of semaphores failed.\n");
     //     return -1;
@@ -197,6 +206,7 @@ int cleanup() {
     mem_retcode |= munmap(NB, sizeof(*NB));
     mem_retcode |= munmap(activeImmigrants, sizeof(*activeImmigrants));
     mem_retcode |= munmap(judge, sizeof(*judge));
+    mem_retcode |= munmap(processesCount, sizeof(*processesCount));
     // if (mem_retcode == -1) {
     //     fprintf(stderr, "ERROR: Cleanup of shared memory failed.\n");
     //     return -1;
@@ -263,7 +273,6 @@ void process_immigrant(unsigned ID, unsigned getcert_time) {
     // left
     immLeave(NAME, ID);
     sem_post(no_judge);
-
 }
 
 void judgeEnter(const char* NAME) {
@@ -334,7 +343,6 @@ void process_judge(unsigned enter_time, unsigned conf_time) {
     writelog(A, NAME, ": finishes\n", *A, NAME);
 }
 
-
 int main(int argc, char *argv[]) {
     args_t args;
     if (!are_args_valid(argc, argv, &args)) {
@@ -357,7 +365,9 @@ int main(int argc, char *argv[]) {
     #endif
 
     int wstatus = 0, retcode = 0;
+    pid_t wpid;
     *activeImmigrants = args.PI;
+    *processesCount = args.PI + 1;
     pid_t process = fork();
     if (process == 0) {
         // child process - immigrant generator
@@ -367,6 +377,10 @@ int main(int argc, char *argv[]) {
             pid_t immigrant = fork();  // immigrant process
             if (immigrant == 0) {
                 process_immigrant(immigrantID, args.IT);
+                *processesCount -= 1;
+                if (*processesCount == 0) {
+                    sem_post(parent);
+                }
                 exit(EXIT_SUCCESS);
             } else {
                 // generator proceeds
@@ -384,24 +398,23 @@ int main(int argc, char *argv[]) {
             #endif
         }
 
-        // pid_t generator = fork();
-        // if (generator == 0) {
-        //     // generate_immigrants(int PI, int delay);
-        // }
-        // wait(&wstatus);
-
-        if (WIFEXITED(wstatus) && WEXITSTATUS(wstatusall) == EXIT_SUCCESS) {
+        if (WIFEXITED(wstatusall) && WEXITSTATUS(wstatusall) == EXIT_SUCCESS) {
             fprintf(stderr, "IMM GEN - EVERYTHING OK.\n");
             retcode = EXIT_SUCCESS;
         } else {
             fprintf(stderr, "IMM GEN - SOMETHING PROBABLY HAPPENED.\n");
             retcode = EXIT_SUCCESS;
         }
-        return retcode;
+        *processesCount -= 1;
+        if (*processesCount == 0) {
+            sem_post(parent);
+        }
+        exit(retcode);
     } else {
         // parent process - judge
         process_judge(args.JG, args.JT);
     }
+    sem_wait(parent);
 
     wait(&wstatus); // waits for immigrant generator to die
     if (WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == EXIT_SUCCESS) {
@@ -412,7 +425,7 @@ int main(int argc, char *argv[]) {
         retcode = EXIT_FAILURE;
     }
     if (cleanup() == -1) {
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
-    return retcode;
+    exit(retcode);
 }
