@@ -12,8 +12,9 @@
 
 #include "proj2.h"
 
-sem_t *noJudge;  // turnstile for incoming immigrants, protects entered
-sem_t *mutex;     //
+/* Global variables definitions */
+sem_t *noJudge;
+sem_t *mutex;
 sem_t *confirmed;
 sem_t *allSignedIn;
 sem_t *logWritten;
@@ -71,7 +72,7 @@ bool areArgsValid(int argc, char *argv[], args_t *args) {
         return false;
     }
 
-    unsigned arg_values[VALID_ARGS_NUM];
+    unsigned argValues[VALID_ARGS_NUM];
     for (int i = 0; i < VALID_ARGS_NUM; i++) {
         char *endptr;
         const unsigned BASE = 10;
@@ -80,13 +81,13 @@ bool areArgsValid(int argc, char *argv[], args_t *args) {
             fprintf(stderr, "ERROR: Arguments must be positive integers!\n\n");
             return false;
         }
-        arg_values[i] = arg;
+        argValues[i] = arg;
     }
-    args->PI = arg_values[0];
-    args->IG = arg_values[1];
-    args->JG = arg_values[2];
-    args->IT = arg_values[3];
-    args->JT = arg_values[4];
+    args->PI = argValues[0];
+    args->IG = argValues[1];
+    args->JG = argValues[2];
+    args->IT = argValues[3];
+    args->JT = argValues[4];
     if (args->PI < 1 || args->IG > 2000 || args->JG > 2000 ||
             args->IT > 2000 || args->JT > 2000) {
         fprintf(stderr, "ERROR: Argument values out of range!\n\n");
@@ -97,9 +98,6 @@ bool areArgsValid(int argc, char *argv[], args_t *args) {
 }
 
 void randSleep(unsigned ms) {
-    // if (ms == 0) {
-    //     return;
-    // }
     srand(time(0));  // set starting point for pseudo-random operations
     ms = rand() % (ms + 1);  // integer in interval <0, ms>
     struct timespec req, rem;
@@ -144,13 +142,13 @@ int setup() {
     int SHARED_FLAGS = MAP_SHARED | MAP_ANONYMOUS; // handling of map data
     entered = mmap(NULL, sizeof(*entered), SHARED_PROT, SHARED_FLAGS, -1, 0);
     checked = mmap(NULL, sizeof(*checked), SHARED_PROT, SHARED_FLAGS, -1, 0);
+    A = mmap(NULL, sizeof(*checked), SHARED_PROT, SHARED_FLAGS, -1, 0);
     NB = mmap(NULL, sizeof(*checked), SHARED_PROT, SHARED_FLAGS, -1, 0);
     activeImmigrants = mmap(NULL, sizeof(*checked), SHARED_PROT, SHARED_FLAGS, -1, 0);
     judge = mmap(NULL, sizeof(*checked), SHARED_PROT, SHARED_FLAGS, -1, 0);
-    A = mmap(NULL, sizeof(*checked), SHARED_PROT, SHARED_FLAGS, -1, 0);
 
-    if (entered == MAP_FAILED || checked == MAP_FAILED || A == MAP_FAILED ||
-            activeImmigrants == MAP_FAILED || judge == MAP_FAILED || NB == MAP_FAILED) {
+    if (activeImmigrants == MAP_FAILED || judge == MAP_FAILED || A == MAP_FAILED ||
+            checked == MAP_FAILED || entered == MAP_FAILED || NB == MAP_FAILED) {
         fprintf(stderr, "ERROR: Initial setup of shared memory failed.\n");
         retcode = -1;
     }
@@ -261,7 +259,6 @@ void process_immigrant(unsigned ID, unsigned getcert_time) {
     sem_wait(noJudge);
     immLeave(NAME, ID);     // left
     sem_post(noJudge);
-    // sem_post(mutex);  // FIXME: NOT IN PSEUDOCODE
 }
 
 void judgeEnter(const char* NAME) {
@@ -277,6 +274,11 @@ void judgeStartConfirm(const char* NAME, unsigned conf_time) {
 }
 
 void judgeConfirm(const char* NAME) {
+    for (int i = 0; i < *checked; i++) { // confirmed.signal(checked)
+        sem_post(confirmed);
+    }
+    *activeImmigrants -= *entered;
+    *entered = *checked = 0;
     writelog(NAME, ": ends confirmation:   %d: %d: %d\n", *entered, *checked, *NB);
 }
 
@@ -310,11 +312,6 @@ void process_judge(unsigned enter_time, unsigned conf_time) {
         // starts confirmation
         judgeStartConfirm(NAME, conf_time);
         sem_wait(sharedMutex);
-        for (int i = 0; i < *checked; i++) { // confirmed.signal(checked)
-            sem_post(confirmed);
-        }
-        *activeImmigrants -= *entered;
-        *entered = *checked = 0;
         judgeConfirm(NAME);
         sem_post(sharedMutex); // ends confirmation
         // 5. wants to leave
@@ -340,10 +337,13 @@ int main(int argc, char *argv[]) {
 
     int immigrantID = 1;
     *activeImmigrants = args.PI;
-    pid_t wpid;
     int wstatus = 0, retcode = 0;
+    pid_t wpid;
     pid_t process = fork();
-    if (process == 0) {
+    if (process < 0) {
+        cleanup();
+        fprintf(stderr, "ERROR: Fork failed. Terminating the program...");
+    } else if (process == 0) {
         // child process - immigrant generator
         for (size_t i = 0; i < args.PI; i++, immigrantID++) {
             randSleep(args.IG);  // TODO:  check for IG == 0
@@ -351,6 +351,9 @@ int main(int argc, char *argv[]) {
             if (immigrant == 0) {
                 process_immigrant(immigrantID, args.IT);
                 return EXIT_SUCCESS;
+            } else if (immigrant < 0) {
+                cleanup();
+                fprintf(stderr, "ERROR: Fork failed. Terminating the program...");
             }
         }
         // wait for all the immigrant processes to die
@@ -376,11 +379,9 @@ int main(int argc, char *argv[]) {
             retcode = EXIT_FAILURE;
         }
     }
-
     #ifdef DEBUG
     fprintf(stderr, "DONE\n");
     #endif
-
     if (cleanup() == -1) {
         return EXIT_FAILURE;
     }

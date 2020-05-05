@@ -23,27 +23,27 @@
 #include <time.h>           // nanosleep, sleep
 #include <stdarg.h>         // fprintf arguments
 
-#define DEBUG               // debug logs define
+// #define DEBUG               // debug logs define
 
-extern sem_t *noJudge;  // turnstile for incoming immigrants, protects entered
-extern sem_t *mutex;     //
-extern sem_t *confirmed;
-extern sem_t *allSignedIn;
-extern sem_t *logWritten;
-extern sem_t *sharedMutex;
-extern const char* noJudgeName;
-extern const char* mutexName;
-extern const char* confirmedName;
-extern const char* allSignedInName;
-extern const char* logWrittenName;
-extern const char* sharedMutexName;
-extern int *entered;
-extern int *checked;
-extern int *A;
-extern int *NB;
-extern int *activeImmigrants;
-extern bool *judge;
-extern FILE *out;
+extern sem_t *noJudge;      // turnstile for incoming immigrants, protects entered
+extern sem_t *mutex;        // mutex protecting checked variable
+extern sem_t *confirmed;    // semaphor singaling that judge has confirmed imms
+extern sem_t *allSignedIn;  // semaphor if all entered imms have checked in
+extern sem_t *logWritten;   // mutex for log writing
+extern sem_t *sharedMutex;  // mutex shared memory manipulation
+extern const char* noJudgeName;     // noJudge     semaphor name
+extern const char* mutexName;       // mutex       semaphor name
+extern const char* confirmedName;   // confirmed   semaphor name
+extern const char* allSignedInName; // allSignedIn semaphor name
+extern const char* logWrittenName;  // logWritten  semaphor name
+extern const char* sharedMutexName; // sharedMutex semaphor name
+extern int *entered;        // entered immigrants, not certified yet
+extern int *checked;        // checked immigrants, not certified yet
+extern int *A;              // order of logs counter
+extern int *NB;             // counts of immigrants inside the building
+extern int *activeImmigrants;   // total number of imm processes yet to die
+extern bool *judge;         // is judge inside the building?
+extern FILE *out;           // pointer for the output file
 #endif
 
 
