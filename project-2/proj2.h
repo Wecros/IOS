@@ -94,7 +94,7 @@ int cleanup();
  * @details Uses variable number of arguments for printing.
  *          Increments the order of operations variable.
  */
-void writelog(const char* fmt, ...);
+void writelog(int *A, const char* NAME, const char* fmt, ...);
 
 /**
  * @brief Function to signify that an immigrant entered the building.
@@ -115,3 +115,18 @@ void immLeave(const char* NAME, unsigned ID);
  * @brief Function to signify that a judge entered the building.
  */
 void judgeEnter(const char* NAME);
+
+/**
+ * @brief Function to signify that a judge entered the building.
+ */
+void judgeStartConfirm(const char* NAME);
+
+/**
+ * @brief Function to signify that a judge entered the building.
+ */
+void judgeConfirm(const char* NAME);
+
+/**
+ * @brief Function to signify that a judge entered the building.
+ */
+void judgeLeave(const char* NAME);
