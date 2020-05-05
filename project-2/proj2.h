@@ -23,7 +23,7 @@
 #include <time.h>           // nanosleep, sleep
 #include <stdarg.h>         // fprintf arguments
 
-// #define DEBUG               // debug logs define
+#define DEBUG               // debug logs define
 #endif
 
 /**
