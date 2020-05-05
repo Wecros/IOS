@@ -12,18 +12,18 @@
 
 #include "proj2.h"
 
-sem_t *no_judge;  // turnstile for incoming immigrants, protects entered
+sem_t *noJudge;  // turnstile for incoming immigrants, protects entered
 sem_t *mutex;     //
 sem_t *confirmed;
 sem_t *allSignedIn;
 sem_t *logWritten;
 sem_t *sharedMutex;
-const char* no_judge_name = "wec.no_judge";
-const char* mutex_name = "wec.mutex";
-const char* confirmed_name = "wec.confirmed";
-const char* allSignedIn_name = "wec.allSignedIn";
-const char* logWritten_name = "wec.printing";
-const char* sharedMutex_name = "wec.sharedMutex";
+const char* noJudgeName = "wec.noJudge";
+const char* mutexName = "wec.mutex";
+const char* confirmedName = "wec.confirmed";
+const char* allSignedInName = "wec.allSignedIn";
+const char* logWrittenName = "wec.printing";
+const char* sharedMutexName = "wec.sharedMutex";
 int *entered;
 int *checked;
 int *A;
@@ -33,7 +33,7 @@ bool *judge;
 FILE *out;
 
 
-void print_help() {
+void printHelp() {
     fprintf(stderr,
     "USAGE: proj2 <PI> <IG> <JG> <IT> <JT>\n"
     "  PI: Number of processes generated in immigrant category.\n"
@@ -50,7 +50,7 @@ void print_help() {
     );
 }
 
-void writelog(int *A, const char* NAME, const char* fmt, ...) {
+void writelog(const char* NAME, const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
 
@@ -63,7 +63,7 @@ void writelog(int *A, const char* NAME, const char* fmt, ...) {
     va_end(ap);
 }
 
-bool are_args_valid(int argc, char *argv[], args_t *args) {
+bool areArgsValid(int argc, char *argv[], args_t *args) {
     // if number of arguments is not 5, return false
     const int VALID_ARGS_NUM = 5;
     if (argc != VALID_ARGS_NUM + 1) {
@@ -96,10 +96,10 @@ bool are_args_valid(int argc, char *argv[], args_t *args) {
     return true;
 }
 
-void rand_sleep(unsigned ms) {
-    if (ms == 0) {
-        return;
-    }
+void randSleep(unsigned ms) {
+    // if (ms == 0) {
+    //     return;
+    // }
     srand(time(0));  // set starting point for pseudo-random operations
     ms = rand() % (ms + 1);  // integer in interval <0, ms>
     struct timespec req, rem;
@@ -109,8 +109,8 @@ void rand_sleep(unsigned ms) {
         req.tv_nsec = ms * 1000000; // multiply ms to get nanoseconds
     } else {
         // greater than 1 second
-        rem.tv_sec = ms / 1000;
-        req.tv_nsec = (ms - rem.tv_sec * 1000) * 1000000;
+        req.tv_sec = ms / 1000;
+        req.tv_nsec = (ms - req.tv_sec * 1000) * 1000000;
     }
 
     // put the process to sleep
@@ -127,13 +127,13 @@ int setup() {
     // semaphore setup
     mode_t SEM_MODE = O_CREAT | O_EXCL;
     unsigned int SEM_PERMS = 0666;
-    no_judge = sem_open(no_judge_name, SEM_MODE, SEM_PERMS, 1);
-    mutex = sem_open(mutex_name, SEM_MODE, SEM_PERMS, 1);
-    confirmed = sem_open(confirmed_name, SEM_MODE, SEM_PERMS, 0);
-    allSignedIn = sem_open(allSignedIn_name, SEM_MODE, SEM_PERMS, 0);
-    logWritten = sem_open(logWritten_name, SEM_MODE, SEM_PERMS, 1);
-    sharedMutex = sem_open(sharedMutex_name, SEM_MODE, SEM_PERMS, 1);
-    if (no_judge == SEM_FAILED || mutex == SEM_FAILED || confirmed == SEM_FAILED ||
+    noJudge = sem_open(noJudgeName, SEM_MODE, SEM_PERMS, 1);
+    mutex = sem_open(mutexName, SEM_MODE, SEM_PERMS, 1);
+    confirmed = sem_open(confirmedName, SEM_MODE, SEM_PERMS, 0);
+    allSignedIn = sem_open(allSignedInName, SEM_MODE, SEM_PERMS, 0);
+    logWritten = sem_open(logWrittenName, SEM_MODE, SEM_PERMS, 1);
+    sharedMutex = sem_open(sharedMutexName, SEM_MODE, SEM_PERMS, 1);
+    if (noJudge == SEM_FAILED || mutex == SEM_FAILED || confirmed == SEM_FAILED ||
             allSignedIn == SEM_FAILED || logWritten == SEM_FAILED ||
             sharedMutex == SEM_FAILED) {
         fprintf(stderr, "ERROR: Initial setup of semaphores failed.\n");
@@ -172,18 +172,18 @@ int cleanup() {
     // semaphor cleanup
     int retcode, sem_retcode, mem_retcode;
     retcode = sem_retcode = mem_retcode = 0;
-    sem_retcode |= sem_close(no_judge);
+    sem_retcode |= sem_close(noJudge);
     sem_retcode |= sem_close(mutex);
     sem_retcode |= sem_close(confirmed);
     sem_retcode |= sem_close(allSignedIn);
     sem_retcode |= sem_close(logWritten);
     sem_retcode |= sem_close(sharedMutex);
-    sem_retcode |= sem_unlink(no_judge_name);
-    sem_retcode |= sem_unlink(mutex_name);
-    sem_retcode |= sem_unlink(confirmed_name);
-    sem_retcode |= sem_unlink(allSignedIn_name);
-    sem_retcode |= sem_unlink(logWritten_name);
-    sem_retcode |= sem_unlink(sharedMutex_name);
+    sem_retcode |= sem_unlink(noJudgeName);
+    sem_retcode |= sem_unlink(mutexName);
+    sem_retcode |= sem_unlink(confirmedName);
+    sem_retcode |= sem_unlink(allSignedInName);
+    sem_retcode |= sem_unlink(logWrittenName);
+    sem_retcode |= sem_unlink(sharedMutexName);
     if (sem_retcode == -1) {
         fprintf(stderr, "ERROR: Cleanup of semaphores failed.\n");
         retcode = -1;
@@ -210,32 +210,32 @@ void immEnter(const char* NAME, unsigned ID) {
     (*NB)++;
     (*entered)++;
     sem_post(sharedMutex);
-    writelog(A, NAME, "%2d: enters:              %d: %d: %d\n", ID, *entered, *checked, *NB);
+    writelog(NAME, "%2d: enters:              %d: %d: %d\n", ID, *entered, *checked, *NB);
 }
 
 void immCheckIn(const char* NAME, unsigned ID) {
     sem_wait(sharedMutex);
     (*checked)++;
     sem_post(sharedMutex);
-    writelog(A, NAME, "%2d: checks:              %d: %d: %d\n", ID, *entered, *checked, *NB);
+    writelog(NAME, "%2d: checks:              %d: %d: %d\n", ID, *entered, *checked, *NB);
 }
 
 void immLeave(const char* NAME, unsigned ID) {
     sem_wait(sharedMutex);
     (*NB)--;
     sem_post(sharedMutex);
-    writelog(A, NAME, "%2d: leaves:              %d: %d: %d\n", ID, *entered, *checked, *NB);
+    writelog(NAME, "%2d: leaves:              %d: %d: %d\n", ID, *entered, *checked, *NB);
 }
 
 void process_immigrant(unsigned ID, unsigned getcert_time) {
     // 1. init
     const char* NAME = "IMM";
-    writelog(A, NAME, "%2d: starts\n", ID);
+    writelog(NAME, "%2d: starts\n", ID);
 
     // 2. wants to enter
-    sem_wait(no_judge);
+    sem_wait(noJudge);
     immEnter(NAME, ID);     // entered
-    sem_post(no_judge);
+    sem_post(noJudge);
 
     // 3. wants to register
     sem_wait(mutex);
@@ -252,16 +252,15 @@ void process_immigrant(unsigned ID, unsigned getcert_time) {
 
     // 5. wants certificate
     sem_wait(sharedMutex);  // mutex until judge confirms all
-    writelog(A, NAME, "%2d: wants certificate:   %d: %d: %d\n", ID, *entered, *checked, *NB);
+    writelog(NAME, "%2d: wants certificate:   %d: %d: %d\n", ID, *entered, *checked, *NB);
     sem_post(sharedMutex);
-    rand_sleep(getcert_time);
+    randSleep(getcert_time);
     // got certificate
-    writelog(A, NAME, "%2d: got certificate:     %d: %d: %d\n", ID, *entered, *checked, *NB);
-
+    writelog(NAME, "%2d: got certificate:     %d: %d: %d\n", ID, *entered, *checked, *NB);
     // 6. wants to leave
-    sem_wait(no_judge);
+    sem_wait(noJudge);
     immLeave(NAME, ID);     // left
-    sem_post(no_judge);
+    sem_post(noJudge);
     // sem_post(mutex);  // FIXME: NOT IN PSEUDOCODE
 }
 
@@ -269,21 +268,21 @@ void judgeEnter(const char* NAME) {
     sem_wait(sharedMutex);
     *judge = true;
     sem_post(sharedMutex);
-    writelog(A, NAME, ": enters:              %d: %d: %d\n", *entered, *checked, *NB);
+    writelog(NAME, ": enters:              %d: %d: %d\n", *entered, *checked, *NB);
 }
 
 void judgeStartConfirm(const char* NAME, unsigned conf_time) {
-    writelog(A, NAME, ": starts confirmation: %d: %d: %d\n", *entered, *checked, *NB);
-    rand_sleep(conf_time);
+    writelog(NAME, ": starts confirmation: %d: %d: %d\n", *entered, *checked, *NB);
+    randSleep(conf_time);
 }
 
 void judgeConfirm(const char* NAME) {
-    writelog(A, NAME, ": ends confirmation:   %d: %d: %d\n", *entered, *checked, *NB);
+    writelog(NAME, ": ends confirmation:   %d: %d: %d\n", *entered, *checked, *NB);
 }
 
 void judgeLeave(const char* NAME, unsigned conf_time) {
-    rand_sleep(conf_time);
-    writelog(A, NAME, ": leaves:              %d: %d: %d\n", *entered, *checked, *NB);
+    randSleep(conf_time);
+    writelog(NAME, ": leaves:              %d: %d: %d\n", *entered, *checked, *NB);
     *judge = false;
 }
 
@@ -294,9 +293,9 @@ void process_judge(unsigned enter_time, unsigned conf_time) {
     // loop until all immigrant processes were registered:
     while (*activeImmigrants != 0) {
         // 2. wants to enter
-        rand_sleep(enter_time);
-        writelog(A, NAME, ": wants to enter\n", *A, NAME);
-        sem_wait(no_judge);
+        randSleep(enter_time);
+        writelog(NAME, ": wants to enter\n");
+        sem_wait(noJudge);
         sem_wait(mutex);
 
         judgeEnter(NAME);  // 3. entered
@@ -304,7 +303,7 @@ void process_judge(unsigned enter_time, unsigned conf_time) {
         // 4. confirm the naturalization
         // wait for immigrants
         if (*entered > *checked) {
-            writelog(A, NAME, ": waits for imm:       %d: %d: %d\n", *entered, *checked, *NB);
+            writelog(NAME, ": waits for imm:       %d: %d: %d\n", *entered, *checked, *NB);
             sem_post(mutex);
             sem_wait(allSignedIn);
         } // and get the mutex back
@@ -322,15 +321,15 @@ void process_judge(unsigned enter_time, unsigned conf_time) {
         judgeLeave(NAME, conf_time);  // leaves
 
         sem_post(mutex);
-        sem_post(no_judge);
+        sem_post(noJudge);
     }
-    writelog(A, NAME, ": finishes\n", *A, NAME);  // 7. finishes
+    writelog(NAME, ": finishes\n");  // 7. finishes
 }
 
 int main(int argc, char *argv[]) {
     args_t args;
-    if (!are_args_valid(argc, argv, &args)) {
-        print_help();
+    if (!areArgsValid(argc, argv, &args)) {
+        printHelp();
         return EXIT_FAILURE;
     }
     if (setup() == -1) {
@@ -347,7 +346,7 @@ int main(int argc, char *argv[]) {
     if (process == 0) {
         // child process - immigrant generator
         for (size_t i = 0; i < args.PI; i++, immigrantID++) {
-            rand_sleep(args.IG);  // TODO:  check for IG == 0
+            randSleep(args.IG);  // TODO:  check for IG == 0
             pid_t immigrant = fork();  // immigrant process
             if (immigrant == 0) {
                 process_immigrant(immigrantID, args.IT);

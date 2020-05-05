@@ -25,18 +25,18 @@
 
 #define DEBUG               // debug logs define
 
-extern sem_t *no_judge;  // turnstile for incoming immigrants, protects entered
+extern sem_t *noJudge;  // turnstile for incoming immigrants, protects entered
 extern sem_t *mutex;     //
 extern sem_t *confirmed;
 extern sem_t *allSignedIn;
 extern sem_t *logWritten;
 extern sem_t *sharedMutex;
-extern const char* no_judge_name;
-extern const char* mutex_name;
-extern const char* confirmed_name;
-extern const char* allSignedIn_name;
-extern const char* logWritten_name;
-extern const char* sharedMutex_name;
+extern const char* noJudgeName;
+extern const char* mutexName;
+extern const char* confirmedName;
+extern const char* allSignedInName;
+extern const char* logWrittenName;
+extern const char* sharedMutexName;
 extern int *entered;
 extern int *checked;
 extern int *A;
@@ -64,7 +64,7 @@ typedef struct args {
  *
  * @details Used when invalid arguments entered.
  */
-void print_help();
+void printHelp();
 
 /**
  * @brief Validates arguments.
@@ -72,7 +72,7 @@ void print_help();
  * @details If the args are valid, assign them to args structure.
  * @returns True if args are valid, false if they aren't.
  */
-bool are_args_valid(int argc, char *argv[], args_t *args);
+bool areArgsValid(int argc, char *argv[], args_t *args);
 
 /**
  * @brief Supsends a thread for a random time in an <0, ms> int interval.
@@ -81,7 +81,7 @@ bool are_args_valid(int argc, char *argv[], args_t *args);
  *          or gets interrupted an error is raised and the process killed.
  * @param ms The upper bound for the time interval in milliseconds.
  */
-void rand_sleep(unsigned ms);
+void randSleep(unsigned ms);
 
 /**
  * @brief Processes immigrants.
@@ -115,7 +115,7 @@ int cleanup();
  * @details Uses variable number of arguments for printing.
  *          Increments the order of operations variable.
  */
-void writelog(int *A, const char* NAME, const char* fmt, ...);
+void writelog(const char* NAME, const char* fmt, ...);
 
 /**
  * @brief Function to signify that an immigrant entered the building.
@@ -138,16 +138,16 @@ void immLeave(const char* NAME, unsigned ID);
 void judgeEnter(const char* NAME);
 
 /**
- * @brief Function to signify that a judge entered the building.
+ * @brief Function to signify that a judge started confirmation process.
  */
 void judgeStartConfirm(const char* NAME, unsigned conf_time);
 
 /**
- * @brief Function to signify that a judge entered the building.
+ * @brief Function to signify that a judge confirmed all immigrants.
  */
 void judgeConfirm(const char* NAME);
 
 /**
- * @brief Function to signify that a judge entered the building.
+ * @brief Function to signify that a judge left the building.
  */
 void judgeLeave(const char* NAME, unsigned conf_time);
