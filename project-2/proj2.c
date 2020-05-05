@@ -97,9 +97,9 @@ bool are_args_valid(int argc, char *argv[], args_t *args) {
 }
 
 void rand_sleep(unsigned ms) {
-    // if (ms == 0) {
-    //     return;
-    // }
+    if (ms == 0) {
+        return;
+    }
     srand(time(0));  // set starting point for pseudo-random operations
     ms = rand() % (ms + 1);  // integer in interval <0, ms>
     struct timespec req, rem;
@@ -234,28 +234,24 @@ void process_immigrant(unsigned ID, unsigned getcert_time) {
 
     // 2. wants to enter
     sem_wait(no_judge);
-    // entered
-    immEnter(NAME, ID);
+    immEnter(NAME, ID);     // entered
     sem_post(no_judge);
 
     // 3. wants to register
     sem_wait(mutex);
-    // registered
-    immCheckIn(NAME, ID);
+    immCheckIn(NAME, ID);   // registered
 
     // 4. waits for judge's confirmation
     if (*judge == true && *entered == *checked) {
         sem_post(allSignedIn);
     } else {
-        // pass the mutex
-        sem_post(mutex);
+        sem_post(mutex);    // pass the mutex
     }
-
     // 4.5 waits for judge to confirm
     sem_wait(confirmed);
 
     // 5. wants certificate
-    sem_wait(sharedMutex);
+    sem_wait(sharedMutex);  // mutex until judge confirms all
     writelog(A, NAME, "%2d: wants certificate:   %d: %d: %d\n", ID, *entered, *checked, *NB);
     sem_post(sharedMutex);
     rand_sleep(getcert_time);
@@ -264,26 +260,31 @@ void process_immigrant(unsigned ID, unsigned getcert_time) {
 
     // 6. wants to leave
     sem_wait(no_judge);
-    // left
-    immLeave(NAME, ID);
+    immLeave(NAME, ID);     // left
     sem_post(no_judge);
     // sem_post(mutex);  // FIXME: NOT IN PSEUDOCODE
 }
 
 void judgeEnter(const char* NAME) {
+    sem_wait(sharedMutex);
+    *judge = true;
+    sem_post(sharedMutex);
     writelog(A, NAME, ": enters:              %d: %d: %d\n", *entered, *checked, *NB);
 }
 
-void judgeStartConfirm(const char* NAME) {
+void judgeStartConfirm(const char* NAME, unsigned conf_time) {
     writelog(A, NAME, ": starts confirmation: %d: %d: %d\n", *entered, *checked, *NB);
+    rand_sleep(conf_time);
 }
 
 void judgeConfirm(const char* NAME) {
     writelog(A, NAME, ": ends confirmation:   %d: %d: %d\n", *entered, *checked, *NB);
 }
 
-void judgeLeave(const char* NAME) {
+void judgeLeave(const char* NAME, unsigned conf_time) {
+    rand_sleep(conf_time);
     writelog(A, NAME, ": leaves:              %d: %d: %d\n", *entered, *checked, *NB);
+    *judge = false;
 }
 
 void process_judge(unsigned enter_time, unsigned conf_time) {
@@ -298,47 +299,32 @@ void process_judge(unsigned enter_time, unsigned conf_time) {
         sem_wait(no_judge);
         sem_wait(mutex);
 
-        // 3. entered
-        judgeEnter(NAME);
-        sem_wait(sharedMutex);
-        *judge = true;
-        sem_post(sharedMutex);
+        judgeEnter(NAME);  // 3. entered
 
         // 4. confirm the naturalization
-
         // wait for immigrants
         if (*entered > *checked) {
             writelog(A, NAME, ": waits for imm:       %d: %d: %d\n", *entered, *checked, *NB);
             sem_post(mutex);
             sem_wait(allSignedIn);
         } // and get the mutex back
-
         // starts confirmation
-        judgeStartConfirm(NAME);
-        rand_sleep(conf_time);
-        // confirmed.signal(checked)
+        judgeStartConfirm(NAME, conf_time);
         sem_wait(sharedMutex);
-        for (int i = 0; i < *checked; i++) {
+        for (int i = 0; i < *checked; i++) { // confirmed.signal(checked)
             sem_post(confirmed);
         }
         *activeImmigrants -= *entered;
         *entered = *checked = 0;
         judgeConfirm(NAME);
-        sem_post(sharedMutex);
-        // ends confirmation
-
+        sem_post(sharedMutex); // ends confirmation
         // 5. wants to leave
-        rand_sleep(conf_time);
-
-        // leaves
-        judgeLeave(NAME);
-        *judge = false;
+        judgeLeave(NAME, conf_time);  // leaves
 
         sem_post(mutex);
         sem_post(no_judge);
     }
-    // finishes
-    writelog(A, NAME, ": finishes\n", *A, NAME);
+    writelog(A, NAME, ": finishes\n", *A, NAME);  // 7. finishes
 }
 
 int main(int argc, char *argv[]) {

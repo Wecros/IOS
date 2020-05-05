@@ -24,7 +24,28 @@
 #include <stdarg.h>         // fprintf arguments
 
 #define DEBUG               // debug logs define
+
+extern sem_t *no_judge;  // turnstile for incoming immigrants, protects entered
+extern sem_t *mutex;     //
+extern sem_t *confirmed;
+extern sem_t *allSignedIn;
+extern sem_t *logWritten;
+extern sem_t *sharedMutex;
+extern const char* no_judge_name;
+extern const char* mutex_name;
+extern const char* confirmed_name;
+extern const char* allSignedIn_name;
+extern const char* logWritten_name;
+extern const char* sharedMutex_name;
+extern int *entered;
+extern int *checked;
+extern int *A;
+extern int *NB;
+extern int *activeImmigrants;
+extern bool *judge;
+extern FILE *out;
 #endif
+
 
 /**
  * @brief Args structure for program arguments.
@@ -119,7 +140,7 @@ void judgeEnter(const char* NAME);
 /**
  * @brief Function to signify that a judge entered the building.
  */
-void judgeStartConfirm(const char* NAME);
+void judgeStartConfirm(const char* NAME, unsigned conf_time);
 
 /**
  * @brief Function to signify that a judge entered the building.
@@ -129,4 +150,4 @@ void judgeConfirm(const char* NAME);
 /**
  * @brief Function to signify that a judge entered the building.
  */
-void judgeLeave(const char* NAME);
+void judgeLeave(const char* NAME, unsigned conf_time);
