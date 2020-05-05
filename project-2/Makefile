@@ -9,9 +9,8 @@
 ZIP_FILE = proj2.zip
 
 CC = gcc
-CFLAGS  = -std=gnu99 -Wall -Wextra -pedantic -g
-# CFLAGS  = -std=gnu99 -Wall -Wextra -Werror -pedantic -g # use this
-# LDFLAGS = -lpthread -lrt
+CFLAGS  = -std=gnu99 -Wall -Wextra -Werror -pedantic # hand this in
+# CFLAGS  = -std=gnu99 -Wall -Wextra -Werror -pedantic -g # debug
 LDFLAGS = -pthread -lrt
 
 PROGRAM = proj2
@@ -25,6 +24,4 @@ $(ZIP_FILE): *.c *.h Makefile
 	zip $@ $^
 
 clean:
-	@rm -rf *.o
-
-	@echo Removed all nonessential files.
+	rm -rf $(PROGRAM) *.o
