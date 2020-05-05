@@ -1,6 +1,6 @@
 # @file Makefile
 # @author Marek Filip (xfilip46), FIT BUT
-# @date 2020-Apr-24
+# @date 2020-May-05
 # @brief IOS-project-2
 # @details Makefile for IOS project 2.
 #		   Project only recompiles when files change.

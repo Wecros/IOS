@@ -1,7 +1,7 @@
 /**
  * @file proj2.c
  * @author Marek Filip (xfilip46), FIT BUT
- * @date 2020-Apr-24
+ * @date 2020-May-05
  * @brief IOS-project-2
  * @see http://greenteapress.com/semaphores/LittleBookOfSemaphores.pdf
  *      https://www.fit.vutbr.cz/study/courses/IOS/private/Lab/projekty/projekt2/projekt2.pdf
