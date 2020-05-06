@@ -353,8 +353,8 @@ int main(int argc, char *argv[]) {
                 process_immigrant(immigrantID, args.IT);
                 return EXIT_SUCCESS;
             } else if (immigrant < 0) {
-                fprintf(stderr, "ERROR: Immigrant Fork failed."
-                                "       Terminating the process.\n");
+                fprintf(stderr, "ERROR: Immigrant Fork failed.\n"
+                                "       Terminating the process...\n");
                 return EXIT_FAILURE;
             }
         }
