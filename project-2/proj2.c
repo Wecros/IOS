@@ -343,6 +343,7 @@ int main(int argc, char *argv[]) {
     if (process < 0) {
         cleanup();
         fprintf(stderr, "ERROR: Fork failed. Terminating the program...\n");
+        return EXIT_FAILURE;
     } else if (process == 0) {
         // child process - immigrant generator
         for (size_t i = 0; i < args.PI; i++, immigrantID++) {
@@ -352,8 +353,9 @@ int main(int argc, char *argv[]) {
                 process_immigrant(immigrantID, args.IT);
                 return EXIT_SUCCESS;
             } else if (immigrant < 0) {
-                cleanup();
-                fprintf(stderr, "ERROR: Fork failed. Terminating the program...\n");
+                fprintf(stderr, "ERROR: Immigrant Fork failed."
+                                "       Terminating the process.\n");
+                return EXIT_FAILURE;
             }
         }
         // wait for all the immigrant processes to die
