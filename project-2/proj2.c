@@ -342,7 +342,7 @@ int main(int argc, char *argv[]) {
     pid_t process = fork();
     if (process < 0) {
         cleanup();
-        fprintf(stderr, "ERROR: Fork failed. Terminating the program...");
+        fprintf(stderr, "ERROR: Fork failed. Terminating the program...\n");
     } else if (process == 0) {
         // child process - immigrant generator
         for (size_t i = 0; i < args.PI; i++, immigrantID++) {
@@ -353,7 +353,7 @@ int main(int argc, char *argv[]) {
                 return EXIT_SUCCESS;
             } else if (immigrant < 0) {
                 cleanup();
-                fprintf(stderr, "ERROR: Fork failed. Terminating the program...");
+                fprintf(stderr, "ERROR: Fork failed. Terminating the program...\n");
             }
         }
         // wait for all the immigrant processes to die
@@ -361,7 +361,7 @@ int main(int argc, char *argv[]) {
             if (WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == EXIT_SUCCESS) {
                 retcode = EXIT_SUCCESS;
             } else {
-                fprintf(stderr, "ERROR: Immigrant proccess exited with failure");
+                fprintf(stderr, "ERROR: Immigrant proccess exited with failure.\n");
                 retcode = EXIT_FAILURE;
             }
         }
@@ -375,7 +375,7 @@ int main(int argc, char *argv[]) {
         if (WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == EXIT_SUCCESS) {
             retcode = EXIT_SUCCESS;
         } else {
-            fprintf(stderr, "ERROR: Immigrant generator exited with failure.");
+            fprintf(stderr, "ERROR: Immigrant generator exited with failure.\n");
             retcode = EXIT_FAILURE;
         }
     }
