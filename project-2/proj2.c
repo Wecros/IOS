@@ -369,8 +369,20 @@ int main(int argc, char *argv[]) {
         }
         return retcode;
     } else {
-        // parent process - judge
         process_judge(args.JG, args.JT);
+        // main continues
+        process = fork();
+        if (process < 0) {
+            cleanup();
+            fprintf(stderr, "ERROR: Fork failed. Terminating the program...\n");
+            return EXIT_FAILURE;
+        } else if (process == 0) {
+            // judge process
+            process_judge(args.JG, args.JT);
+            return EXIT_SUCCESS;
+        } else {
+            // main continues
+        }
     }
     // wait for the immigrant generator process to die
     while ((wpid = wait(&wstatus)) > 0) {
